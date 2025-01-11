@@ -101,5 +101,15 @@ class TechnologySkill(Base):
     personal_information = relationship("PersonalInformation", back_populates="technology_skills")
 
 
+class Admin(Base):
+    __tablename__ = 'admins'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, unique=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+
+    def verify_password(self, password: str):
+        return pwd_context.verify(password, self.hashed_password)
+
 # Create all tables in the database
 Base.metadata.create_all(bind=engine)

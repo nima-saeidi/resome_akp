@@ -1,12 +1,17 @@
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, Date, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import date
+from datetime import date, datetime, timedelta
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 import os
 
 # Database connection URL for PostgreSQL
@@ -21,6 +26,13 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # Create a base class for declarative models
 Base = declarative_base()
 
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# JWT settings
+SECRET_KEY = "your-secret-key"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # Define your models
 class PersonalInformation(Base):
@@ -109,6 +121,17 @@ class TechnologySkill(Base):
     personal_information = relationship("PersonalInformation", back_populates="technology_skills")
 
 
+class Admin(Base):
+    __tablename__ = 'admins'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, unique=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+
+    def verify_password(self, password: str):
+        return pwd_context.verify(password, self.hashed_password)
+
+
 # Create all tables in the database
 Base.metadata.create_all(bind=engine)
 
@@ -124,6 +147,11 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
+# Serve static files (e.g., resumes)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Templates directory
+templates = Jinja2Templates(directory="templates")
 
 # Dependency to get the database session
 def get_db():
@@ -185,6 +213,50 @@ class WorkExperienceCreate(BaseModel):
     reason_for_leaving: str
 
 
+class AdminRegister(BaseModel):
+    username: str
+    password: str
+
+
+class AdminLogin(BaseModel):
+    username: str
+    password: str
+
+
+# JWT utilities
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+def verify_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+
+
+# Admin authentication dependency
+from fastapi.security import OAuth2PasswordBearer
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/admin/login")
+
+
+async def get_current_admin(token: str = Depends(oauth2_scheme)):
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return payload
+
+
 # Ensure the static folder exists
 os.makedirs("static", exist_ok=True)
 
@@ -219,13 +291,9 @@ async def save_resume(
     db: Session = Depends(get_db)
 ):
     try:
-        # Ensure the static folder exists
-        os.makedirs("static", exist_ok=True)
-
-        # Save the uploaded file to the static folder as bytes
+        # Save the uploaded file to the static folder
         file_path = f"static/{resume.filename}"
         with open(file_path, "wb") as buffer:
-            # Read the file content as bytes and write it to the file
             buffer.write(await resume.read())
 
         # Update the user's resume file path in the database
@@ -237,119 +305,90 @@ async def save_resume(
         db.commit()
 
         return {"message": "Resume saved successfully", "file_path": file_path}
-    except HTTPException as http_exc:
-        # Re-raise HTTPException to avoid wrapping it in another exception
-        raise http_exc
-    except Exception as e:
-        db.rollback()
-        # Return a generic error message without exposing the binary data
-        raise HTTPException(status_code=500, detail="Failed to save resume. Please try again.")
-
-# API to save technology skill for a user
-@app.post("/save-technology-skill/{user_id}")
-async def save_technology_skill(
-    user_id: int,
-    tech_skill: TechnologySkillCreate,
-    db: Session = Depends(get_db)
-):
-    try:
-        # Create a new TechnologySkill object
-        db_tech_skill = TechnologySkill(**tech_skill.dict(), personal_information_id=user_id)
-
-        # Add to the database
-        db.add(db_tech_skill)
-        db.commit()
-        db.refresh(db_tech_skill)
-
-        return {"message": "Technology skill saved successfully", "id": db_tech_skill.id}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# API to save language skill for a user
-@app.post("/save-language-skill/{user_id}")
-async def save_language_skill(
-    user_id: int,
-    lang_skill: LanguageSkillCreate,
+# Admin registration
+@app.post("/admin/register")
+async def admin_register(
+    admin: AdminRegister,
     db: Session = Depends(get_db)
 ):
-    try:
-        # Create a new LanguageSkill object
-        db_lang_skill = LanguageSkill(**lang_skill.dict(), personal_information_id=user_id)
+    # Check if admin already exists
+    db_admin = db.query(Admin).filter(Admin.username == admin.username).first()
+    if db_admin:
+        raise HTTPException(status_code=400, detail="Admin already exists")
 
-        # Add to the database
-        db.add(db_lang_skill)
-        db.commit()
-        db.refresh(db_lang_skill)
+    # Hash the password
+    hashed_password = pwd_context.hash(admin.password)
 
-        return {"message": "Language skill saved successfully", "id": db_lang_skill.id}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+    # Create new admin
+    db_admin = Admin(username=admin.username, hashed_password=hashed_password)
+    db.add(db_admin)
+    db.commit()
+    db.refresh(db_admin)
+
+    return {"message": "Admin registered successfully"}
 
 
-# API to save job application for a user
-@app.post("/save-job-application/{user_id}")
-async def save_job_application(
-    user_id: int,
-    job_app: JobApplicationCreate,
+# Admin login
+@app.post("/admin/login")
+async def admin_login(
+    admin: AdminLogin,
     db: Session = Depends(get_db)
 ):
-    try:
-        # Create a new JobApplication object
-        db_job_app = JobApplication(**job_app.dict(), personal_information_id=user_id)
+    # Check if admin exists
+    db_admin = db.query(Admin).filter(Admin.username == admin.username).first()
+    if not db_admin or not db_admin.verify_password(admin.password):
+        raise HTTPException(status_code=400, detail="Invalid credentials")
 
-        # Add to the database
-        db.add(db_job_app)
-        db.commit()
-        db.refresh(db_job_app)
-
-        return {"message": "Job application saved successfully", "id": db_job_app.id}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+    # Create JWT token
+    access_token = create_access_token(data={"sub": db_admin.username})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
-# API to save education for a user
-@app.post("/save-education/{user_id}")
-async def save_education(
-    user_id: int,
-    education: EducationCreate,
+# Admin dashboard
+@app.get("/admin/dashboard", response_class=HTMLResponse)
+async def admin_dashboard(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(get_current_admin)
+):
+    # Fetch all users with their personal information
+    users = db.query(PersonalInformation).all()
+    return templates.TemplateResponse("admin.html", {"request": request, "users": users})
+
+
+# Admin login page
+@app.get("/admin/login", response_class=HTMLResponse)
+async def admin_login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+
+# Admin register page
+@app.post("/admin/register")
+async def admin_register(
+    admin: AdminRegister,  # JSON input (username and password)
     db: Session = Depends(get_db)
 ):
-    try:
-        # Create a new Education object
-        db_education = Education(**education.dict(), personal_information_id=user_id)
+    # Check if admin already exists
+    db_admin = db.query(Admin).filter(Admin.username == admin.username).first()
+    if db_admin:
+        raise HTTPException(status_code=400, detail="Admin already exists")
 
-        # Add to the database
-        db.add(db_education)
-        db.commit()
-        db.refresh(db_education)
+    # Hash the password
+    hashed_password = pwd_context.hash(admin.password)
 
-        return {"message": "Education saved successfully", "id": db_education.id}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+    # Create new admin
+    db_admin = Admin(username=admin.username, hashed_password=hashed_password)
+    db.add(db_admin)
+    db.commit()
+    db.refresh(db_admin)
 
-
-# API to save work experience for a user
-@app.post("/save-work-experience/{user_id}")
-async def save_work_experience(
-    user_id: int,
-    work_exp: WorkExperienceCreate,
-    db: Session = Depends(get_db)
-):
-    try:
-        # Create a new WorkExperience object
-        db_work_exp = WorkExperience(**work_exp.dict(), personal_information_id=user_id)
-
-        # Add to the database
-        db.add(db_work_exp)
-        db.commit()
-        db.refresh(db_work_exp)
-
-        return {"message": "Work experience saved successfully", "id": db_work_exp.id}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": "Admin registered successfully", "username": db_admin.username}
+# Run the application
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
