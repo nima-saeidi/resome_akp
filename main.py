@@ -13,7 +13,24 @@ from datetime import date, datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 import os
-
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Request, status, Form
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, Date, ForeignKey
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship, sessionmaker
+from pydantic import BaseModel
+from typing import List, Optional
+from datetime import date, datetime, timedelta
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+import os
+import pandas as pd
+from io import BytesIO
 # Database connection URL for PostgreSQL
 DATABASE_URL = "postgresql://postgres:n1m010@localhost:5432/akp"
 
@@ -247,14 +264,24 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/admin/login")
 
 
 async def get_current_admin(token: str = Depends(oauth2_scheme)):
-    payload = verify_token(token)
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return payload
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    db = SessionLocal()
+    db_admin = db.query(Admin).filter(Admin.username == username).first()
+    if db_admin is None:
+        raise credentials_exception
+    return db_admin
 
 
 # Ensure the static folder exists
@@ -309,6 +336,114 @@ async def save_resume(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/save-technology-skill/{user_id}")
+async def save_technology_skill(
+    user_id: int,
+    tech_skill: TechnologySkillCreate,
+    db: Session = Depends(get_db)
+):
+    try:
+        # Create a new TechnologySkill object
+        db_tech_skill = TechnologySkill(**tech_skill.dict(), personal_information_id=user_id)
+
+        # Add to the database
+        db.add(db_tech_skill)
+        db.commit()
+        db.refresh(db_tech_skill)
+
+        return {"message": "Technology skill saved successfully", "id": db_tech_skill.id}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# API to save language skill for a user
+@app.post("/save-language-skill/{user_id}")
+async def save_language_skill(
+    user_id: int,
+    lang_skill: LanguageSkillCreate,
+    db: Session = Depends(get_db)
+):
+    try:
+        # Create a new LanguageSkill object
+        db_lang_skill = LanguageSkill(**lang_skill.dict(), personal_information_id=user_id)
+
+        # Add to the database
+        db.add(db_lang_skill)
+        db.commit()
+        db.refresh(db_lang_skill)
+
+        return {"message": "Language skill saved successfully", "id": db_lang_skill.id}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# API to save job application for a user
+@app.post("/save-job-application/{user_id}")
+async def save_job_application(
+    user_id: int,
+    job_app: JobApplicationCreate,
+    db: Session = Depends(get_db)
+):
+    try:
+        # Create a new JobApplication object
+        db_job_app = JobApplication(**job_app.dict(), personal_information_id=user_id)
+
+        # Add to the database
+        db.add(db_job_app)
+        db.commit()
+        db.refresh(db_job_app)
+
+        return {"message": "Job application saved successfully", "id": db_job_app.id}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# API to save education for a user
+@app.post("/save-education/{user_id}")
+async def save_education(
+    user_id: int,
+    education: EducationCreate,
+    db: Session = Depends(get_db)
+):
+    try:
+        # Create a new Education object
+        db_education = Education(**education.dict(), personal_information_id=user_id)
+
+        # Add to the database
+        db.add(db_education)
+        db.commit()
+        db.refresh(db_education)
+
+        return {"message": "Education saved successfully", "id": db_education.id}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# API to save work experience for a user
+@app.post("/save-work-experience/{user_id}")
+async def save_work_experience(
+    user_id: int,
+    work_exp: WorkExperienceCreate,
+    db: Session = Depends(get_db)
+):
+    try:
+        # Create a new WorkExperience object
+        db_work_exp = WorkExperience(**work_exp.dict(), personal_information_id=user_id)
+
+        # Add to the database
+        db.add(db_work_exp)
+        db.commit()
+        db.refresh(db_work_exp)
+
+        return {"message": "Work experience saved successfully", "id": db_work_exp.id}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # Admin registration
 @app.post("/admin/register")
@@ -336,12 +471,12 @@ async def admin_register(
 # Admin login
 @app.post("/admin/login")
 async def admin_login(
-    admin: AdminLogin,
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
     # Check if admin exists
-    db_admin = db.query(Admin).filter(Admin.username == admin.username).first()
-    if not db_admin or not db_admin.verify_password(admin.password):
+    db_admin = db.query(Admin).filter(Admin.username == form_data.username).first()
+    if not db_admin or not db_admin.verify_password(form_data.password):
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
     # Create JWT token
@@ -367,28 +502,58 @@ async def admin_login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 
-# Admin register page
-@app.post("/admin/register")
-async def admin_register(
-    admin: AdminRegister,  # JSON input (username and password)
-    db: Session = Depends(get_db)
+# Download Excel
+@app.get("/admin/download-excel")
+async def download_excel(
+    db: Session = Depends(get_db),
+    current_admin: dict = Depends(get_current_admin)
 ):
-    # Check if admin already exists
-    db_admin = db.query(Admin).filter(Admin.username == admin.username).first()
-    if db_admin:
-        raise HTTPException(status_code=400, detail="Admin already exists")
+    try:
+        # Fetch all users with their personal information
+        users = db.query(PersonalInformation).all()
 
-    # Hash the password
-    hashed_password = pwd_context.hash(admin.password)
+        # Convert the data to a pandas DataFrame
+        data = [
+            {
+                "ID": user.id,
+                "First Name": user.first_name,
+                "Last Name": user.last_name,
+                "Marital Status": user.marital_status,
+                "Number of Dependents": user.number_of_dependents,
+                "Father Name": user.father_name,
+                "Military Status": user.military_status,
+                "Exemption Type": user.exemption_type,
+                "Place of Birth": user.place_of_birth,
+                "Place of Issue": user.place_of_issue,
+                "Insurance History": user.insurance_history,
+                "Insurance Duration": user.insurance_duration,
+                "Residence Address": user.residence_address,
+                "Birth Type": user.birth_type,
+                "Fixed Number": user.fixed_number,
+                "Mobile Number": user.mobile_number,
+                "How You Knew Us": user.how_you_knew_us,
+                "Resume File Path": user.resume_file_path,
+            }
+            for user in users
+        ]
 
-    # Create new admin
-    db_admin = Admin(username=admin.username, hashed_password=hashed_password)
-    db.add(db_admin)
-    db.commit()
-    db.refresh(db_admin)
+        df = pd.DataFrame(data)
 
-    return {"message": "Admin registered successfully", "username": db_admin.username}
-# Run the application
+        # Create an Excel file in memory
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Users")
+        output.seek(0)
+
+        # Return the Excel file as a downloadable response
+        return FileResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            filename="users.xlsx",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
