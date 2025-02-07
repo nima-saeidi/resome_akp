@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Details</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .details-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .details-container p {
+            margin: 10px 0;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+        .details-container p strong {
+            color: #333;
+            width: 150px;
+            display: inline-block;
+        }
+        .details-container p span {
+            color: #555;
+        }
+        .details-container a {
+            color: #007BFF;
+            text-decoration: none;
+        }
+        .details-container a:hover {
+            text-decoration: underline;
+        }
+        button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="details-container">
+        <h2>User Details</h2>
+        <p><strong>ID:</strong> <span>{{ user.id }}</span></p>
+        <p><strong>First Name:</strong> <span>{{ user.first_name }}</span></p>
+        <p><strong>Last Name:</strong> <span>{{ user.last_name }}</span></p>
+        <p><strong>Marital Status:</strong> <span>{{ user.marital_status }}</span></p>
+        <p><strong>Number of Dependents:</strong> <span>{{ user.number_of_dependents }}</span></p>
+        <p><strong>Father's Name:</strong> <span>{{ user.father_name }}</span></p>
+        <p><strong>Military Status:</strong> <span>{{ user.military_status }}</span></p>
+        <p><strong>Exemption Type:</strong> <span>{{ user.exemption_type }}</span></p>
+        <p><strong>Place of Birth:</strong> <span>{{ user.place_of_birth }}</span></p>
+        <p><strong>Place of Issue:</strong> <span>{{ user.place_of_issue }}</span></p>
+        <p><strong>Insurance History:</strong> <span>{{ user.insurance_history }}</span></p>
+        <p><strong>Insurance Duration:</strong> <span>{{ user.insurance_duration }}</span></p>
+        <p><strong>Residence Address:</strong> <span>{{ user.residence_address }}</span></p>
+        <p><strong>Birth Type:</strong> <span>{{ user.birth_type }}</span></p>
+        <p><strong>Fixed Number:</strong> <span>{{ user.fixed_number }}</span></p>
+        <p><strong>Mobile Number:</strong> <span>{{ user.mobile_number }}</span></p>
+        <p><strong>How You Knew Us:</strong> <span>{{ user.how_you_knew_us }}</span></p>
+        <p><strong>Resume:</strong>
+            {% if user.resume_file_path %}
+                <span><a href="{{ user.resume_file_path }}" download>Download Resume</a></span>
+            {% else %}
+                <span>No Resume Available</span>
+            {% endif %}
+        </p>
+    </div>
+
+    <a href="/admin/users">
+        <button>Back to Users</button>
+    </a>
+</body>
+</html>

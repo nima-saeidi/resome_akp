@@ -3,8 +3,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
 # Database connection URL for PostgreSQL
-# DATABASE_URL = "postgresql://postgres:n1m010@localhost:5432/akp"
-DATABASE_URL = "postgresql://alborz:n1m010@localhost:5432/akp"
+DATABASE_URL = "postgresql://postgres:n1m010@localhost:5432/akp"
+# DATABASE_URL = "postgresql://alborz:n1m010@localhost:5432/akp"
 
 # Create the engine
 engine = create_engine(DATABASE_URL)
@@ -88,7 +88,7 @@ class LanguageSkill(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     personal_information_id = Column(Integer, ForeignKey('personal_information.id'))
     language = Column(String)
-    proficiency = Column(String)  # خوب, متوسط, ضعیف
+    proficiency = Column(String)
     personal_information = relationship("PersonalInformation", back_populates="language_skills")
 
 

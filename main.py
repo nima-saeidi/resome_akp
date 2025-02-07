@@ -32,7 +32,8 @@ import os
 import pandas as pd
 from io import BytesIO
 # Database connection URL for PostgreSQL
-DATABASE_URL = "postgresql://alborz:n1m010@localhost:5432/akp"
+# DATABASE_URL = "postgresql://alborz:n1m010@localhost:5432/akp"
+DATABASE_URL = "postgresql://postgres:n1m010@localhost:5432/akp"
 
 # Create the engine
 engine = create_engine(DATABASE_URL)
@@ -147,7 +148,8 @@ class Admin(Base):
 
     def verify_password(self, password: str):
         return pwd_context.verify(password, self.hashed_password)
-
+    def set_password(self, password: str):
+        self.hashed_password = pwd_context.hash(password)
 
 # Create all tables in the database
 Base.metadata.create_all(bind=engine)
@@ -230,10 +232,9 @@ class WorkExperienceCreate(BaseModel):
     reason_for_leaving: str
 
 
-class AdminRegister(BaseModel):
+class AdminCreate(BaseModel):
     username: str
     password: str
-
 
 class AdminLogin(BaseModel):
     username: str
@@ -262,26 +263,30 @@ from fastapi.security import OAuth2PasswordBearer
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/admin/login")
 
+from fastapi import Depends, HTTPException, status
+from jose import JWTError, jwt
+from sqlalchemy.orm import Session
+from fastapi import Depends, HTTPException, Security
 
-async def get_current_admin(token: str = Depends(oauth2_scheme)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+def get_current_admin(token: str = Security(oauth2_scheme), db: Session = Depends(get_db)):
+    """Validate JWT token and return current admin"""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
 
-    db = SessionLocal()
-    db_admin = db.query(Admin).filter(Admin.username == username).first()
-    if db_admin is None:
-        raise credentials_exception
-    return db_admin
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid authentication token")
+
+        admin = db.query(Admin).filter(Admin.username == username).first()
+
+        if admin is None:
+            raise HTTPException(status_code=401, detail="Admin not found")
+
+        return admin
+
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
 
 
 # Ensure the static folder exists
@@ -444,70 +449,54 @@ async def save_work_experience(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+from starlette.middleware.sessions import SessionMiddleware
 
-# Admin registration
+app.add_middleware(SessionMiddleware, secret_key="your_secret_key")
+
+
 @app.post("/admin/register")
-async def admin_register(
-    admin: AdminRegister,
-    db: Session = Depends(get_db)
-):
-    # Check if admin already exists
-    db_admin = db.query(Admin).filter(Admin.username == admin.username).first()
-    if db_admin:
+def register_admin(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    existing_admin = db.query(Admin).filter(Admin.username == username).first()
+    if existing_admin:
         raise HTTPException(status_code=400, detail="Admin already exists")
 
-    # Hash the password
-    hashed_password = pwd_context.hash(admin.password)
-
-    # Create new admin
-    db_admin = Admin(username=admin.username, hashed_password=hashed_password)
-    db.add(db_admin)
+    new_admin = Admin(username=username, hashed_password=pwd_context.hash(password))
+    db.add(new_admin)
     db.commit()
-    db.refresh(db_admin)
-
+    db.refresh(new_admin)
     return {"message": "Admin registered successfully"}
 
-
-# Admin login
 @app.post("/admin/login")
-async def admin_login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
-):
-    # Check if admin exists
-    db_admin = db.query(Admin).filter(Admin.username == form_data.username).first()
-    if not db_admin or not db_admin.verify_password(form_data.password):
+def login_admin(request: Request, username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    admin = db.query(Admin).filter(Admin.username == username).first()
+    if not admin or not pwd_context.verify(password, admin.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
-    # Create JWT token
-    access_token = create_access_token(data={"sub": db_admin.username})
-    return {"access_token": access_token, "token_type": "bearer"}
+    request.session["admin"] = admin.username  # Store in session
+    return RedirectResponse(url="/admin/dashboard", status_code=303)
 
-
-# Admin dashboard
-@app.get("/admin/dashboard", response_class=HTMLResponse)
-async def admin_dashboard(
-    request: Request,
-    db: Session = Depends(get_db),
-    current_admin: dict = Depends(get_current_admin)
-):
-    # Fetch all users with their personal information
-    users = db.query(PersonalInformation).all()
-    return templates.TemplateResponse("admin.html", {"request": request, "users": users})
-
-
-# Admin login page
 @app.get("/admin/login", response_class=HTMLResponse)
-async def admin_login_page(request: Request):
+def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
+@app.get("/admin/dashboard", response_class=HTMLResponse)
+def dashboard(request: Request):
+    admin = request.session.get("admin")
+    if not admin:
+        return RedirectResponse(url="/admin/login")
+
+    return templates.TemplateResponse("dashboard.html", {"request": request, "admin": admin})
+
+@app.get("/admin/logout")
+def logout_admin(request: Request):
+    request.session.clear()
+    return RedirectResponse(url="/admin/login")
+
+from fastapi.responses import StreamingResponse
 
 # Download Excel
 @app.get("/admin/download-excel")
-async def download_excel(
-    db: Session = Depends(get_db),
-    current_admin: dict = Depends(get_current_admin)
-):
+async def download_excel(db: Session = Depends(get_db)):
     try:
         # Fetch all users with their personal information
         users = db.query(PersonalInformation).all()
@@ -543,16 +532,91 @@ async def download_excel(
         output = BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             df.to_excel(writer, index=False, sheet_name="Users")
-        output.seek(0)
+        output.seek(0)  # Move the cursor to the beginning
 
-        # Return the Excel file as a downloadable response
-        return FileResponse(
-            output,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            filename="users.xlsx",
-        )
+        # Use StreamingResponse to send the file as a response
+        headers = {
+            "Content-Disposition": "attachment; filename=users.xlsx"
+        }
+        return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers=headers)
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/user/{user_id}")
+async def get_user_details(
+    request: Request,
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    # Fetch user details from the database
+    user = db.query(PersonalInformation).filter(PersonalInformation.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Prepare the data to pass to the template
+    user_data = {
+        "id": user.id,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "marital_status": user.marital_status,
+        "number_of_dependents": user.number_of_dependents,
+        "father_name": user.father_name,
+        "military_status": user.military_status,
+        "exemption_type": user.exemption_type,
+        "place_of_birth": user.place_of_birth,
+        "place_of_issue": user.place_of_issue,
+        "insurance_history": user.insurance_history,
+        "insurance_duration": user.insurance_duration,
+        "residence_address": user.residence_address,
+        "birth_type": user.birth_type,
+        "fixed_number": user.fixed_number,
+        "mobile_number": user.mobile_number,
+        "how_you_knew_us": user.how_you_knew_us,
+        "resume_file_path": user.resume_file_path,
+    }
+
+    # Render the user-detail.html template with the user data
+    return templates.TemplateResponse(
+        "user-details.html",
+        {"request": request, "user": user_data}
+    )
+
+
+
+from fastapi.responses import FileResponse
+import os
+
+@app.get("/admin/view-resume/{user_id}")
+async def view_resume(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(PersonalInformation).filter(PersonalInformation.id == user_id).first()
+    if not user or not user.resume_file_path:
+        raise HTTPException(status_code=404, detail="Resume not found")
+
+    return FileResponse(user.resume_file_path, media_type="application/pdf")
+
+
+@app.get("/admin/users")
+async def users_page(request: Request, db: Session = Depends(get_db)):
+    users = db.query(PersonalInformation).all()
+    return templates.TemplateResponse("users.html", {"request": request, "users": users})
+
+@app.get("/admin/download-resume/{user_id}")
+async def download_resume(user_id: int, db: Session = Depends(get_db)):
+    # Get user data
+    user = db.query(PersonalInformation).filter(PersonalInformation.id == user_id).first()
+    if not user or not user.resume_file_path:
+        raise HTTPException(status_code=404, detail="Resume not found")
+
+    resume_path = user.resume_file_path
+
+    # Check if the file exists in the file system
+    if not os.path.exists(resume_path):
+        raise HTTPException(status_code=404, detail="Resume file not found")
+
+    # Return the resume file as a downloadable response
+    return FileResponse(resume_path, media_type="application/octet-stream", filename=os.path.basename(resume_path))
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .dashboard-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        label {
+            font-size: 16px;
+            color: #333;
+            margin-right: 10px;
+        }
+        select {
+            padding: 8px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        a {
+            text-decoration: none;
+        }
+        a button {
+            background-color: #28a745;
+        }
+        a button:hover {
+            background-color: #218838;
+        }
+        .logout-button {
+            background-color: #dc3545;
+        }
+        .logout-button:hover {
+            background-color: #c82333;
+        }
+    </style>
+    <script>
+        async function loadUsers() {
+            const response = await fetch('/admin/users');
+            const data = await response.json();
+            const select = document.getElementById("userSelect");
+
+            data.users.forEach(user => {
+                let option = document.createElement("option");
+                option.value = user.id;
+                option.textContent = user.name;
+                select.appendChild(option);
+            });
+        }
+
+        function viewResume() {
+            const userId = document.getElementById("userSelect").value;
+            if (userId) {
+                window.open(`/admin/view-resume/${userId}`, "_blank");
+            }
+        }
+
+        window.onload = loadUsers;
+    </script>
+</head>
+<body>
+    <div class="navbar">
+        {% include 'navbar.html' %}
+    </div>
+    <div class="dashboard-container">
+        <h2>Welcome, Admin</h2>
+
+
+        <br><br>
+        <a href="/admin/download-excel">
+            <button>Download Users Excel</button>
+        </a>
+
+        <br><br>
+        <a href="/admin/logout">
+            <button class="logout-button">Logout</button>
+        </a>
+    </div>
+</body>
+</html>
