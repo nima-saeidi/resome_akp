@@ -603,7 +603,7 @@ async def users_page(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("users.html", {"request": request, "users": users})
 
 
-@router.get("/admin/download-resume/{user_id}")
+@app.get("/admin/download-resume/{user_id}")
 async def download_resume(user_id: int, db: Session = Depends(get_db)):
     # Get user data
     user = db.query(PersonalInformation).filter(PersonalInformation.id == user_id).first()
