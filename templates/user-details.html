@@ -80,13 +80,13 @@
         <p><strong>Fixed Number:</strong> <span>{{ user.fixed_number }}</span></p>
         <p><strong>Mobile Number:</strong> <span>{{ user.mobile_number }}</span></p>
         <p><strong>How You Knew Us:</strong> <span>{{ user.how_you_knew_us }}</span></p>
-        <p><strong>Resume:</strong>
-            {% if user.resume_file_path %}
-                <span><a href="http://185.208.175.233:5000/static{{ user.resume_file_path }}" download>Download Resume</a></span>
-            {% else %}
-                <span>No Resume Available</span>
-            {% endif %}
-        </p>
+<p><strong>Resume:</strong>
+    {% if user.resume_file_path %}
+        <span><a href="http://185.208.175.233:5000/static{{ user.resume_file_path }}" target="_blank">View Resume</a></span>
+    {% else %}
+        <span>No Resume Available</span>
+    {% endif %}
+</p>
     </div>
 
     <a href="/admin/users">
