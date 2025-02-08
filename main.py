@@ -609,15 +609,22 @@ async def download_resume(user_id: int, db: Session = Depends(get_db)):
     if not user or not user.resume_file_path:
         raise HTTPException(status_code=404, detail="Resume not found")
 
-    resume_path = user.resume_file_path
+    resume_path = Path(user.resume_file_path)  # Ensure it's a Path object
 
-    # Check if the file exists in the file system
-    if not os.path.exists(resume_path):
+    # Convert relative path to absolute if necessary
+    if not resume_path.is_absolute():
+        resume_path = Path(os.getcwd()) / resume_path
+
+    # Check if file exists
+    if not resume_path.exists():
         raise HTTPException(status_code=404, detail="Resume file not found")
 
-    # Return the resume file as a downloadable response
-    return FileResponse(resume_path, media_type="application/octet-stream", filename=os.path.basename(resume_path))
-
+    # Return file as downloadable response
+    return FileResponse(
+        resume_path,
+        media_type="application/pdf",  # Change to correct file type if needed
+        filename=resume_path.name
+    )
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
