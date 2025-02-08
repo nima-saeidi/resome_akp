@@ -82,7 +82,7 @@
         <p><strong>How You Knew Us:</strong> <span>{{ user.how_you_knew_us }}</span></p>
         <p><strong>Resume:</strong>
             {% if user.resume_file_path %}
-                <span><a href="{{ user.resume_file_path }}" download>Download Resume</a></span>
+                <span><a href="http://185.208.175.233:5000/static{{ user.resume_file_path }}" download>Download Resume</a></span>
             {% else %}
                 <span>No Resume Available</span>
             {% endif %}

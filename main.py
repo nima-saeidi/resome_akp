@@ -602,29 +602,39 @@ async def users_page(request: Request, db: Session = Depends(get_db)):
     users = db.query(PersonalInformation).all()
     return templates.TemplateResponse("users.html", {"request": request, "users": users})
 
-@app.get("/admin/download-resume/{user_id}")
+
+@router.get("/admin/download-resume/{user_id}")
 async def download_resume(user_id: int, db: Session = Depends(get_db)):
     # Get user data
     user = db.query(PersonalInformation).filter(PersonalInformation.id == user_id).first()
     if not user or not user.resume_file_path:
         raise HTTPException(status_code=404, detail="Resume not found")
 
-    resume_path = Path(user.resume_file_path)  # Ensure it's a Path object
+    resume_path = Path(user.resume_file_path)
 
-    # Convert relative path to absolute if necessary
+    # Convert relative path to absolute
     if not resume_path.is_absolute():
         resume_path = Path(os.getcwd()) / resume_path
 
-    # Check if file exists
+    # Ensure file exists
     if not resume_path.exists():
         raise HTTPException(status_code=404, detail="Resume file not found")
 
+    # Detect file MIME type
+    mime_type, _ = mimetypes.guess_type(resume_path)
+    mime_type = mime_type or "application/octet-stream"  # Default if unknown
+
     # Return file as downloadable response
     return FileResponse(
-        resume_path,
-        media_type="application/pdf",  # Change to correct file type if needed
-        filename=resume_path.name
+        path=resume_path,
+        media_type=mime_type,
+        filename=resume_path.name,
+        headers={"Content-Disposition": f"attachment; filename={resume_path.name}"}
     )
+
+
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
