@@ -32,8 +32,8 @@ import os
 import pandas as pd
 from io import BytesIO
 # Database connection URL for PostgreSQL
-# DATABASE_URL = "postgresql://alborz:n1m010@localhost:5432/akp"
-DATABASE_URL = "postgresql://postgres:n1m010@localhost:5432/akp"
+DATABASE_URL = "postgresql://alborz:n1m010@localhost:5432/akp"
+# DATABASE_URL = "postgresql://postgres:n1m010@localhost:5432/akp"
 
 # Create the engine
 engine = create_engine(DATABASE_URL)
