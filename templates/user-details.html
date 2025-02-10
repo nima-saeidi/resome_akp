@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Details</title>
+    <title>جزئیات کاربر</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -21,7 +21,7 @@
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            max-width: 600px;
+            max-width: 800px;
             margin: 0 auto;
         }
         .details-container p {
@@ -31,7 +31,7 @@
         }
         .details-container p strong {
             color: #333;
-            width: 150px;
+            width: 200px;
             display: inline-block;
         }
         .details-container p span {
@@ -58,39 +58,97 @@
         button:hover {
             background-color: #0056b3;
         }
+        .section {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
     <div class="details-container">
-        <h2>User Details</h2>
-        <p><strong>ID:</strong> <span>{{ user.id }}</span></p>
-        <p><strong>First Name:</strong> <span>{{ user.first_name }}</span></p>
-        <p><strong>Last Name:</strong> <span>{{ user.last_name }}</span></p>
-        <p><strong>Marital Status:</strong> <span>{{ user.marital_status }}</span></p>
-        <p><strong>Number of Dependents:</strong> <span>{{ user.number_of_dependents }}</span></p>
-        <p><strong>Father's Name:</strong> <span>{{ user.father_name }}</span></p>
-        <p><strong>Military Status:</strong> <span>{{ user.military_status }}</span></p>
-        <p><strong>Exemption Type:</strong> <span>{{ user.exemption_type }}</span></p>
-        <p><strong>Place of Birth:</strong> <span>{{ user.place_of_birth }}</span></p>
-        <p><strong>Place of Issue:</strong> <span>{{ user.place_of_issue }}</span></p>
-        <p><strong>Insurance History:</strong> <span>{{ user.insurance_history }}</span></p>
-        <p><strong>Insurance Duration:</strong> <span>{{ user.insurance_duration }}</span></p>
-        <p><strong>Residence Address:</strong> <span>{{ user.residence_address }}</span></p>
-        <p><strong>Birth Type:</strong> <span>{{ user.birth_type }}</span></p>
-        <p><strong>Fixed Number:</strong> <span>{{ user.fixed_number }}</span></p>
-        <p><strong>Mobile Number:</strong> <span>{{ user.mobile_number }}</span></p>
-        <p><strong>How You Knew Us:</strong> <span>{{ user.how_you_knew_us }}</span></p>
-<p><strong>Resume:</strong>
-    {% if user.resume_file_path %}
-        <span><a href="http://185.208.175.233:5000/{{ user.resume_file_path }}" target="_blank">View Resume</a></span>
-    {% else %}
-        <span>No Resume Available</span>
-    {% endif %}
-</p>
+        <h2>جزئیات کاربر</h2>
+        <p><strong>شناسه:</strong> <span>{{ user.id }}</span></p>
+        <p><strong>نام:</strong> <span>{{ user.first_name }}</span></p>
+        <p><strong>نام خانوادگی:</strong> <span>{{ user.last_name }}</span></p>
+        <p><strong>وضعیت تأهل:</strong> <span>{{ user.marital_status }}</span></p>
+        <p><strong>تعداد افراد تحت تکفل:</strong> <span>{{ user.number_of_dependents }}</span></p>
+        <p><strong>نام پدر:</strong> <span>{{ user.father_name }}</span></p>
+        <p><strong>وضعیت خدمت سربازی:</strong> <span>{{ user.military_status }}</span></p>
+        <p><strong>نوع معافیت:</strong> <span>{{ user.exemption_type }}</span></p>
+        <p><strong>محل تولد:</strong> <span>{{ user.place_of_birth }}</span></p>
+        <p><strong>محل صدور:</strong> <span>{{ user.place_of_issue }}</span></p>
+        <p><strong>سابقه بیمه:</strong> <span>{{ user.insurance_history }}</span></p>
+        <p><strong>مدت بیمه:</strong> <span>{{ user.insurance_duration }}</span></p>
+        <p><strong>آدرس محل سکونت:</strong> <span>{{ user.residence_address }}</span></p>
+        <p><strong>تاریخ تولد:</strong> <span>{{ user.birth_type }}</span></p>
+        <p><strong>تلفن ثابت:</strong> <span>{{ user.fixed_number }}</span></p>
+        <p><strong>تلفن همراه:</strong> <span>{{ user.mobile_number }}</span></p>
+        <p><strong>نحوه آشنایی با ما:</strong> <span>{{ user.how_you_knew_us }}</span></p>
+        <p><strong>رزومه:</strong>
+            {% if user.resume_file_path %}
+                <span><a href="http://185.208.175.233:5000/{{ user.resume_file_path }}" target="_blank">مشاهده رزومه</a></span>
+            {% else %}
+                <span>رزومه موجود نیست</span>
+            {% endif %}
+        </p>
+
+        <div class="section">
+            <h3>درخواست‌های شغلی</h3>
+            {% for job in user.job_applications %}
+                <p><strong>عنوان شغل:</strong> {{ job.job_title }}</p>
+                <p><strong>نوع همکاری:</strong> {{ job.cooperation_type }}</p>
+            {% endfor %}
+        </div>
+
+        <div class="section">
+            <h3>تحصیلات</h3>
+            {% for edu in user.educations %}
+                <p><strong>سال:</strong> {{ edu.year }}</p>
+                <p><strong>مؤسسه:</strong> {{ edu.institution_name }}</p>
+                <p><strong>رشته:</strong> {{ edu.field_of_study }}</p>
+                <p><strong>مدرک:</strong> {{ edu.degree }}</p>
+            {% endfor %}
+        </div>
+
+        <div class="section">
+            <h3>سوابق کاری</h3>
+            {% for work in user.work_experiences %}
+                <p><strong>سازمان:</strong> {{ work.organization }}</p>
+                <p><strong>سمت:</strong> {{ work.position }}</p>
+                <p><strong>تاریخ شروع:</strong> {{ work.start_date }}</p>
+                <p><strong>تاریخ پایان:</strong> {{ work.end_date }}</p>
+                <p><strong>آخرین حقوق:</strong> {{ work.last_salary }}</p>
+            {% endfor %}
+        </div>
+
+        <div class="section">
+            <h3>مهارت‌های زبانی</h3>
+            {% for lang in user.language_skills %}
+                <p><strong>زبان:</strong> {{ lang.language }}</p>
+                <p><strong>سطح مهارت:</strong> {{ lang.proficiency }}</p>
+            {% endfor %}
+        </div>
+
+        <div class="section">
+            <h3>مهارت‌های فنی</h3>
+            {% for tech in user.technology_skills %}
+                <p><strong>فناوری:</strong> {{ tech.technology }}</p>
+                <p><strong>سطح مهارت:</strong> {{ tech.proficiency }}</p>
+            {% endfor %}
+        </div>
     </div>
+    <button onclick="downloadExcel()">دانلود اکسل</button>
+
+    <script>
+        function downloadExcel() {
+            window.location.href = `/admin/user/{{ user.id }}/download-excel`;
+        }
+    </script>
 
     <a href="/admin/users">
-        <button>Back to Users</button>
+        <button>بازگشت به کاربران</button>
     </a>
 </body>
 </html>

@@ -1,69 +1,89 @@
 <!-- templates/navbar.html -->
 <div class="navbar">
-    <div class="logo">Admin Panel</div>
+    <div class="logo">پنل مدیریت</div>
     <div class="menu-toggle" onclick="toggleMenu()">☰</div>
     <div class="menu" id="menu">
-        <a href="{{ url_for('users_page') }}">Users</a>
-        <div class="dropdown">
-            <div class="dropdown-content">
-                <a href="{{ url_for('download_excel') }}">Download Excel</a>
-                <a href="#">Settings</a>
-            </div>
-        </div>
+        <a href="{{ url_for('users_page') }}">کاربران</a>
+        <a href="{{ url_for('dashboard') }}">داشبورد</a>
+        <a href="{{ url_for('logout_admin') }}">خروج</a>
     </div>
 </div>
 
 <style>
     /* Navbar Styling */
-    body { margin: 0; font-family: Arial, sans-serif; }
+    body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     .navbar {
-        background-color: #333;
+        background-color: #2c3e50;
         overflow: hidden;
         display: flex;
-        justify-content: space-between;
+        justify-content: center;
         padding: 10px 20px;
         align-items: center;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
     .navbar a {
         color: white;
         text-decoration: none;
         padding: 14px 20px;
         display: block;
+        transition: background-color 0.3s ease, transform 0.2s ease;
     }
-    .navbar a:hover { background-color: #575757; }
-    .navbar .logo { font-size: 22px; font-weight: bold; }
-    .navbar .menu { display: flex; }
-    .navbar .menu a { margin-left: 10px; }
-    .navbar .dropdown {
-        position: relative;
-        display: inline-block;
+    .navbar a:hover {
+        background-color: #34495e;
+        transform: translateY(-2px);
     }
-    .navbar .dropdown-content {
-        display: none;
-        position: absolute;
-        background-color: #333;
-        min-width: 160px;
-        z-index: 1;
+    .navbar .logo {
+        font-size: 24px;
+        font-weight: bold;
+        color: #ecf0f1;
     }
-    .navbar .dropdown-content a {
-        color: white;
-        padding: 12px 16px;
-        display: block;
-        text-align: left;
+    .navbar .menu {
+        display: flex;
+        align-items: center;
     }
-    .navbar .dropdown:hover .dropdown-content { display: block; }
+    .navbar .menu a {
+        margin-left: 15px;
+        border-radius: 5px;
+    }
+    .navbar .menu a:last-child {
+        background-color: #e74c3c;
+    }
+    .navbar .menu a:last-child:hover {
+        background-color: #c0392b;
+    }
 
     /* Mobile Menu */
     .menu-toggle {
         display: none;
-        font-size: 24px;
+        font-size: 28px;
         cursor: pointer;
         color: white;
+        transition: transform 0.3s ease;
+    }
+    .menu-toggle:hover {
+        transform: rotate(90deg);
     }
     @media (max-width: 600px) {
-        .navbar .menu { display: none; flex-direction: column; width: 100%; background-color: #333; position: absolute; top: 50px; left: 0; }
-        .navbar .menu a { text-align: center; padding: 10px; }
-        .menu-toggle { display: block; }
+        .navbar .menu {
+            display: none;
+            flex-direction: column;
+            width: 100%;
+            background-color: #2c3e50;
+            position: absolute;
+            top: 60px;
+            left: 0;
+            padding: 10px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .navbar .menu a {
+            text-align: center;
+            padding: 15px;
+            margin: 5px 0;
+            border-radius: 0;
+        }
+        .menu-toggle {
+            display: block;
+        }
     }
 </style>
 

@@ -30,6 +30,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 import os
 import pandas as pd
+from sqlalchemy.orm import joinedload
 from io import BytesIO
 # Database connection URL for PostgreSQL
 DATABASE_URL = "postgresql://alborz:n1m010@localhost:5432/akp"
@@ -498,43 +499,43 @@ from fastapi.responses import StreamingResponse
 @app.get("/admin/download-excel")
 async def download_excel(db: Session = Depends(get_db)):
     try:
-        # Fetch all users with their personal information
+        # دریافت تمام کاربران به همراه اطلاعات شخصی آن‌ها
         users = db.query(PersonalInformation).all()
 
-        # Convert the data to a pandas DataFrame
+        # تبدیل داده‌ها به یک DataFrame در pandas
         data = [
             {
-                "ID": user.id,
-                "First Name": user.first_name,
-                "Last Name": user.last_name,
-                "Marital Status": user.marital_status,
-                "Number of Dependents": user.number_of_dependents,
-                "Father Name": user.father_name,
-                "Military Status": user.military_status,
-                "Exemption Type": user.exemption_type,
-                "Place of Birth": user.place_of_birth,
-                "Place of Issue": user.place_of_issue,
-                "Insurance History": user.insurance_history,
-                "Insurance Duration": user.insurance_duration,
-                "Residence Address": user.residence_address,
-                "Birth Type": user.birth_type,
-                "Fixed Number": user.fixed_number,
-                "Mobile Number": user.mobile_number,
-                "How You Knew Us": user.how_you_knew_us,
-                "Resume File Path": user.resume_file_path,
+                "شناسه": user.id,
+                "نام": user.first_name,
+                "نام خانوادگی": user.last_name,
+                "وضعیت تأهل": user.marital_status,
+                "تعداد افراد تحت تکفل": user.number_of_dependents,
+                "نام پدر": user.father_name,
+                "وضعیت خدمت سربازی": user.military_status,
+                "نوع معافیت": user.exemption_type,
+                "محل تولد": user.place_of_birth,
+                "محل صدور": user.place_of_issue,
+                "سابقه بیمه": user.insurance_history,
+                "مدت بیمه": user.insurance_duration,
+                "آدرس محل سکونت": user.residence_address,
+                "نوع تولد": user.birth_type,
+                "تلفن ثابت": user.fixed_number,
+                "تلفن همراه": user.mobile_number,
+                "نحوه آشنایی با ما": user.how_you_knew_us,
+                "مسیر فایل رزومه": user.resume_file_path,
             }
             for user in users
         ]
 
         df = pd.DataFrame(data)
 
-        # Create an Excel file in memory
+        # ایجاد یک فایل اکسل در حافظه
         output = BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            df.to_excel(writer, index=False, sheet_name="Users")
-        output.seek(0)  # Move the cursor to the beginning
+            df.to_excel(writer, index=False, sheet_name="کاربران")
+        output.seek(0)  # انتقال مکان‌نما به ابتدای فایل
 
-        # Use StreamingResponse to send the file as a response
+        # استفاده از StreamingResponse برای ارسال فایل به عنوان پاسخ
         headers = {
             "Content-Disposition": "attachment; filename=users.xlsx"
         }
@@ -543,19 +544,30 @@ async def download_excel(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.get("/admin/user/{user_id}")
 async def get_user_details(
     request: Request,
     user_id: int,
     db: Session = Depends(get_db)
 ):
-    # Fetch user details from the database
-    user = db.query(PersonalInformation).filter(PersonalInformation.id == user_id).first()
+    # Fetch user details along with related information
+    user = (
+        db.query(PersonalInformation)
+        .filter(PersonalInformation.id == user_id)
+        .options(
+            joinedload(PersonalInformation.job_applications),
+            joinedload(PersonalInformation.educations),
+            joinedload(PersonalInformation.work_experiences),
+            joinedload(PersonalInformation.language_skills),
+            joinedload(PersonalInformation.technology_skills),
+        )
+        .first()
+    )
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Prepare the data to pass to the template
+    # Prepare the user data
     user_data = {
         "id": user.id,
         "first_name": user.first_name,
@@ -575,16 +587,146 @@ async def get_user_details(
         "mobile_number": user.mobile_number,
         "how_you_knew_us": user.how_you_knew_us,
         "resume_file_path": user.resume_file_path,
+        "job_applications": [
+            {
+                "id": job.id,
+                "job_title": job.job_title,
+                "cooperation_type": job.cooperation_type,
+            }
+            for job in user.job_applications
+        ],
+        "educations": [
+            {
+                "id": edu.id,
+                "year": edu.year,
+                "institution_name": edu.institution_name,
+                "field_of_study": edu.field_of_study,
+                "degree": edu.degree,
+            }
+            for edu in user.educations
+        ],
+        "work_experiences": [
+            {
+                "id": work.id,
+                "organization": work.organization,
+                "position": work.position,
+                "start_date": work.start_date,
+                "end_date": work.end_date,
+                "last_salary": work.last_salary,
+                "reason_for_leaving": work.reason_for_leaving,
+            }
+            for work in user.work_experiences
+        ],
+        "language_skills": [
+            {
+                "id": lang.id,
+                "language": lang.language,
+                "proficiency": lang.proficiency,
+            }
+            for lang in user.language_skills
+        ],
+        "technology_skills": [
+            {
+                "id": tech.id,
+                "technology": tech.technology,
+                "proficiency": tech.proficiency,
+            }
+            for tech in user.technology_skills
+        ],
     }
 
-    # Render the user-detail.html template with the user data
+    # Render the user-detail.html template with all the user data
     return templates.TemplateResponse(
         "user-details.html",
         {"request": request, "user": user_data}
     )
 
+@app.get("/admin/user/{user_id}/download-excel")
+async def download_user_excel(user_id: int, db: Session = Depends(get_db)):
+    # دریافت اطلاعات کاربر
+    user = db.query(PersonalInformation).filter(PersonalInformation.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="کاربر یافت نشد")
 
+    # دریافت اطلاعات مرتبط
+    job_applications = db.query(JobApplication).filter(JobApplication.personal_information_id == user_id).all()
+    educations = db.query(Education).filter(Education.personal_information_id == user_id).all()
+    work_experiences = db.query(WorkExperience).filter(WorkExperience.personal_information_id == user_id).all()
+    language_skills = db.query(LanguageSkill).filter(LanguageSkill.personal_information_id == user_id).all()
+    technology_skills = db.query(TechnologySkill).filter(TechnologySkill.personal_information_id == user_id).all()
 
+    # تبدیل داده‌ها به DataFrame
+    user_data = pd.DataFrame([{
+        "شناسه": user.id,
+        "نام": user.first_name,
+        "نام خانوادگی": user.last_name,
+        "وضعیت تأهل": user.marital_status,
+        "تعداد افراد تحت تکفل": user.number_of_dependents,
+        "نام پدر": user.father_name,
+        "وضعیت خدمت سربازی": user.military_status,
+        "نوع معافیت": user.exemption_type,
+        "محل تولد": user.place_of_birth,
+        "محل صدور": user.place_of_issue,
+        "سابقه بیمه": "بله" if user.insurance_history else "خیر",
+        "مدت بیمه": user.insurance_duration,
+        "آدرس محل سکونت": user.residence_address,
+        "نوع تولد": user.birth_type,
+        "تلفن ثابت": user.fixed_number,
+        "تلفن همراه": user.mobile_number,
+        "نحوه آشنایی با ما": user.how_you_knew_us,
+        "مسیر فایل رزومه": f"http://185.208.175.233:5000/{user.resume_file_path}" if user.resume_file_path else "رزومه موجود نیست"
+    }])
+
+    job_data = pd.DataFrame([{
+        "شناسه شغل": job.id,
+        "عنوان شغل": job.job_title,
+        "نوع همکاری": job.cooperation_type,
+    } for job in job_applications]) if job_applications else pd.DataFrame(columns=["شناسه شغل", "عنوان شغل", "نوع همکاری"])
+
+    education_data = pd.DataFrame([{
+        "شناسه تحصیلات": edu.id,
+        "مؤسسه": edu.institution_name,
+        "مدرک": edu.degree,
+        "رشته تحصیلی": edu.field_of_study,
+    } for edu in educations]) if educations else pd.DataFrame(columns=["شناسه تحصیلات", "مؤسسه", "مدرک", "رشته تحصیلی"])
+
+    work_data = pd.DataFrame([{
+        "شناسه کار": work.id,
+        "شرکت": work.organization,
+        "سمت": work.position,
+        "تاریخ شروع": work.start_date,
+        "تاریخ پایان": work.end_date
+    } for work in work_experiences]) if work_experiences else pd.DataFrame(columns=["شناسه کار", "شرکت", "سمت", "تاریخ شروع", "تاریخ پایان"])
+
+    language_data = pd.DataFrame([{
+        "شناسه زبان": lang.id,
+        "زبان": lang.language,
+        "سطح مهارت": lang.proficiency
+    } for lang in language_skills]) if language_skills else pd.DataFrame(columns=["شناسه زبان", "زبان", "سطح مهارت"])
+
+    tech_data = pd.DataFrame([{
+        "شناسه مهارت فنی": tech.id,
+        "فناوری": tech.technology,
+        "سطح مهارت": tech.proficiency
+    } for tech in technology_skills]) if technology_skills else pd.DataFrame(columns=["شناسه مهارت فنی", "فناوری", "سطح مهارت"])
+
+    # ایجاد فایل اکسل در حافظه
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        user_data.to_excel(writer, index=False, sheet_name="اطلاعات کاربر")
+        job_data.to_excel(writer, index=False, sheet_name="درخواست‌های شغلی")
+        education_data.to_excel(writer, index=False, sheet_name="تحصیلات")
+        work_data.to_excel(writer, index=False, sheet_name="سوابق کاری")
+        language_data.to_excel(writer, index=False, sheet_name="مهارت‌های زبانی")
+        tech_data.to_excel(writer, index=False, sheet_name="مهارت‌های فنی")
+
+    output.seek(0)  # انتقال مکان‌نما به ابتدای فایل
+
+    # استفاده از StreamingResponse برای ارسال فایل به عنوان پاسخ
+    headers = {
+        "Content-Disposition": f"attachment; filename=user_{user_id}_details.xlsx"
+    }
+    return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers=headers)
 from fastapi.responses import FileResponse
 import os
 
