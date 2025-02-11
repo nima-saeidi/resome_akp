@@ -113,8 +113,8 @@ class WorkExperience(Base):
     personal_information_id = Column(Integer, ForeignKey('personal_information.id'))
     organization = Column(String)
     position = Column(String)
-    start_date = Column(Date)
-    end_date = Column(Date)
+    start_date = Column(String)
+    end_date = Column(String)
     last_salary = Column(String)
     reason_for_leaving = Column(String)
     personal_information = relationship("PersonalInformation", back_populates="work_experiences")
@@ -227,8 +227,8 @@ class EducationCreate(BaseModel):
 class WorkExperienceCreate(BaseModel):
     organization: str
     position: str
-    start_date: date
-    end_date: date
+    start_date: str
+    end_date: str
     last_salary: str
     reason_for_leaving: str
 
