@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
 # Database connection URL for PostgreSQL
-DATABASE_URL = "postgresql://academyuser:strongpassword@localhost:5432/course_register"
+DATABASE_URL = "postgresql://academyuser:strongpassword@localhost:5432/resome"
 # DATABASE_URL = "postgresql://alborz:n1m010@localhost:5432/akp"
 
 # Create the engine

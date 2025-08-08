@@ -37,7 +37,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 # Database connection URL for PostgreSQL
-DATABASE_URL = "postgresql://academyuser:strongpassword@localhost:5432/course_register"
+DATABASE_URL = "postgresql://academyuser:strongpassword@localhost:5432/resome"
 # DATABASE_URL = "postgresql://postgres:n1m010@localhost:5432/akp"
 
 # Create the engine
