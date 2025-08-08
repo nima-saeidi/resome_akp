@@ -1,5 +1,4 @@
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Request, status
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -14,7 +13,6 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 import os
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Request, status, Form
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -32,8 +30,14 @@ import os
 import pandas as pd
 from sqlalchemy.orm import joinedload
 from io import BytesIO
+from fastapi.middleware.cors import CORSMiddleware
+
+
+
+
+
 # Database connection URL for PostgreSQL
-DATABASE_URL = "postgresql://alborz:n1m010@localhost:5432/akp"
+DATABASE_URL = "postgresql://academyuser:strongpassword@localhost:5432/course_register"
 # DATABASE_URL = "postgresql://postgres:n1m010@localhost:5432/akp"
 
 # Create the engine
@@ -74,7 +78,7 @@ class PersonalInformation(Base):
     fixed_number = Column(String)
     mobile_number = Column(String)
     how_you_knew_us = Column(String)
-    resume_file_path = Column(String)  # Path to the uploaded resume file
+    resume_file_path = Column(String)
 
     # Relationships
     job_applications = relationship("JobApplication", back_populates="personal_information")
@@ -308,8 +312,7 @@ async def save_personal_info(
         db.add(db_personal_info)
         db.commit()
         db.refresh(db_personal_info)
-
-        # Return the generated user ID
+        print(db_personal_info.id)
         return db_personal_info.id
     except Exception as e:
         db.rollback()
@@ -779,4 +782,4 @@ async def download_resume(user_id: int, db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=3000)
